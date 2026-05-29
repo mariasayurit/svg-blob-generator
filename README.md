@@ -16,7 +16,7 @@ A browser-based tool for generating organic blob shapes made of connected circle
 
 ## Usage
 
-1. Open `svg-blob-generator.html`
+1. Open `index.html`
 2. Adjust the controls in the sidebar
 3. Click a shape to preview its SVG code
 4. Check the box on shapes you want to save, then hit **Download selected**
