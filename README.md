@@ -36,5 +36,3 @@ No server required. All generation happens client-side in plain JavaScript.
 | Connect satellites | Bridge adjacent satellites to each other |
 | Seal seams | Merge all shapes into one unified silhouette |
 | Hollow center | Cut a circular hole through the center |
-
-##
