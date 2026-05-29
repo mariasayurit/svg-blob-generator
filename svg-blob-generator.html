@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG Blob Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d; --surface:#181818; --surface2:#222;
+  --border:#2a2a2a; --border2:#3a3a3a;
+  --text:#eee; --muted:#666; --accent:#bbb; --hi:#fff;
+}
+body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-shrink:0}
+header h1{font-size:15px;font-weight:500;letter-spacing:.06em;color:var(--accent)}
+.badge{font-size:9px;padding:2px 9px;border:1px solid var(--border2);border-radius:20px;color:var(--muted);letter-spacing:.12em}
+.app{display:flex;flex:1;overflow:hidden}
+
+.sidebar{width:260px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sec{border-bottom:1px solid var(--border);padding:18px 18px 14px}
+.sec-label{font-size:10px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:14px;font-family:Arial,sans-serif}
+
+.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.preset-btn{background:var(--surface);border:1px solid var(--border2);border-radius:7px;padding:10px 4px;cursor:pointer;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:.03em;color:var(--muted);transition:all .1s;text-align:center}
+.preset-btn:hover{border-color:#555;color:var(--accent)}
+.preset-btn.active{border-color:#888;color:var(--hi);background:var(--surface2)}
+
+.ctrl{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.ctrl:last-child{margin-bottom:0}
+.ctrl-header{display:flex;align-items:baseline;justify-content:space-between}
+.ctrl-label{font-size:13px;color:var(--accent)}
+.ctrl-val{font-size:15px;font-weight:500;color:var(--hi);min-width:36px;text-align:right}
+.ctrl-desc{font-size:11px;color:var(--muted);font-family:Arial,sans-serif}
+input[type=range]{width:100%;-webkit-appearance:none;height:5px;background:var(--border2);border-radius:5px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--hi);cursor:pointer;border:2px solid var(--bg)}
+
+.color-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.color-row:last-child{margin-bottom:0}
+.color-label{font-size:13px;color:var(--accent)}
+input[type=color]{width:38px;height:26px;border:1px solid var(--border2);border-radius:5px;cursor:pointer;padding:2px;background:var(--surface2)}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.toggle-label{font-size:13px;color:var(--accent)}
+.switch{position:relative;width:34px;height:18px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.strack{position:absolute;inset:0;background:var(--surface2);border:1px solid var(--border2);border-radius:18px;cursor:pointer;transition:border-color .12s}
+.strack::before{content:'';position:absolute;width:11px;height:11px;background:var(--muted);border-radius:50%;top:2.5px;left:2.5px;transition:all .12s}
+.switch input:checked+.strack{border-color:#777}
+.switch input:checked+.strack::before{background:var(--hi);transform:translateX(16px)}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.toolbar{display:flex;align-items:center;gap:8px;padding:9px 18px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.toolbar-hint{font-size:11px;color:var(--muted);flex:1;font-family:Arial,sans-serif}
+.btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.05em;padding:6px 14px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;transition:all .1s}
+.btn:hover{border-color:#777;color:var(--accent)}
+.btn.hi{border-color:#555;color:#ccc}
+.btn.hi:hover{border-color:var(--hi);color:var(--hi)}
+
+.grid-wrap{flex:1;overflow-y:auto;padding:18px}
+.blob-grid{display:grid;gap:12px}
+.blob-card{background:#111;border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .1s;aspect-ratio:1;display:flex;align-items:center;justify-content:center;position:relative}
+.blob-card:hover{border-color:var(--border2)}
+.blob-card.selected{border-color:#888;border-width:1px}
+.blob-card svg{width:84%;height:84%}
+.card-actions{position:absolute;bottom:7px;right:7px;display:flex;gap:4px;opacity:0;transition:opacity .1s}
+.blob-card:hover .card-actions{opacity:1}
+.card-btn{font-family:'DM Mono',monospace;font-size:11px;padding:5px 11px;background:rgba(0,0,0,.85);border:1px solid #444;border-radius:5px;color:#aaa;cursor:pointer;transition:all .1s}
+.card-btn:hover{color:var(--hi);border-color:#666}
+.card-check{position:absolute;bottom:8px;left:8px;width:24px;height:24px;border-radius:6px;border:1.5px solid #555;background:rgba(0,0,0,.75);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .1s,border-color .1s,background .1s;z-index:2}
+.card-check.checked{opacity:1 !important;background:#fff;border-color:#fff}
+.card-check.checked svg{display:block}
+.card-check svg{display:none;width:14px;height:14px}
+.blob-card:hover .card-check{opacity:1}
+.card-check{position:absolute;bottom:8px;left:8px;width:18px;height:18px;border-radius:4px;border:1.5px solid #444;background:rgba(0,0,0,.7);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .1s,border-color .1s,background .1s;z-index:2;flex-shrink:0}
+.card-check.checked{opacity:1;background:#fff;border-color:#fff}
+.card-check.checked svg{display:block}
+.card-check svg{display:none;width:14px;height:14px}
+.blob-card:hover .card-check{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>SVG Blob Generator</h1>
+  <span class="badge">VECTOR</span>
+</header>
+<div class="app">
+  <div class="sidebar">
+
+    <div class="sec">
+      <div class="sec-label">Layout</div>
+      <div class="preset-grid" id="presetGrid">
+        <button class="preset-btn active" data-preset="radial">radial</button>
+        <button class="preset-btn" data-preset="ring">ring</button>
+        <button class="preset-btn" data-preset="grid">grid</button>
+        <button class="preset-btn" data-preset="row">row</button>
+        <button class="preset-btn" data-preset="cross">cross</button>
+        <button class="preset-btn" data-preset="random">random</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">Circles</div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Count</span><span class="ctrl-val" id="countOut">4</span></div>
+        <div class="ctrl-desc">Number of satellite circles</div>
+        <input type="range" id="count" min="1" max="12" value="4" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Satellite size</span><span class="ctrl-val" id="satROut">16</span></div>
+        <div class="ctrl-desc">Radius of outer circles</div>
+        <input type="range" id="satR" min="8" max="60" value="16" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Center size</span><span class="ctrl-val" id="coreROut">31</span></div>
+        <div class="ctrl-desc">Radius of center circle</div>
+        <input type="range" id="coreR" min="0" max="80" value="31" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Spread</span><span class="ctrl-val" id="spreadOut">69</span></div>
+        <div class="ctrl-desc">Distance from center</div>
+        <input type="range" id="spread" min="20" max="140" value="69" step="1">
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">Connection</div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Neck width</span><span class="ctrl-val" id="neckOut">45</span></div>
+        <div class="ctrl-desc">Width of bridge between circles</div>
+        <input type="range" id="neck" min="5" max="95" value="45" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Juncture curve</span><span class="ctrl-val" id="junctureOut">33</span></div>
+        <div class="ctrl-desc">Tighter = sharper join, looser = rounder</div>
+        <input type="range" id="juncture" min="5" max="90" value="33" step="1">
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Connect satellites</span>
+        <label class="switch"><input type="checkbox" id="connectSats"><span class="strack"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Seal seams</span>
+        <label class="switch"><input type="checkbox" id="mergeToggle"><span class="strack"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Hollow center</span>
+        <label class="switch"><input type="checkbox" id="hollowToggle"><span class="strack"></span></label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">Color</div>
+      <div class="color-row"><span class="color-label">Shape fill</span><input type="color" id="fillColor" value="#d4d4d4"></div>
+      <div class="color-row"><span class="color-label">Background</span><input type="color" id="bgColor" value="#111111"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">Grid</div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Columns</span><span class="ctrl-val" id="colsOut">4</span></div>
+        <input type="range" id="cols" min="2" max="6" value="4" step="1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-header"><span class="ctrl-label">Total shapes</span><span class="ctrl-val" id="gridCountOut">12</span></div>
+        <input type="range" id="gridCount" min="4" max="24" value="12" step="4">
+      </div>
+    </div>
+
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <span class="toolbar-hint" id="hint">Click to open · checkbox to select</span>
+      <button class="btn hi" id="rerollBtn">⟳  Reroll all</button>
+      <button class="btn hi" onclick="downloadSelected()">↓  Download selected</button>
+    </div>
+    <div class="grid-wrap">
+      <div class="blob-grid" id="blobGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SVG code modal -->
+<div id="modal" onclick="if(event.target===this)closeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#181818;border:1px solid #2e2e2e;border-radius:14px;padding:0;width:820px;max-width:95vw;display:flex;flex-direction:row;overflow:hidden;max-height:90vh">
+    <!-- LEFT: big preview -->
+    <div id="modalPreview" style="width:340px;flex-shrink:0;background:#111;display:flex;align-items:center;justify-content:center;padding:32px;border-right:1px solid #2a2a2a"></div>
+    <!-- RIGHT: code + actions -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:0;min-width:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid #242424">
+        <span style="font-size:9px;letter-spacing:.14em;color:#555;text-transform:uppercase">SVG Code</span>
+        <button onclick="closeModal()" style="background:transparent;border:none;color:#555;font-size:20px;cursor:pointer;line-height:1;padding:0 2px;transition:color .1s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#555'">×</button>
+      </div>
+      <textarea id="svgCode" readonly style="flex:1;width:100%;min-height:260px;background:#0d0d0d;border:none;color:#999;font-family:'DM Mono',monospace;font-size:10px;padding:16px;outline:none;line-height:1.6;resize:none"></textarea>
+      <div style="display:flex;gap:8px;padding:14px 16px;border-top:1px solid #242424">
+        <button onclick="copyCode()" class="btn hi" style="flex:1">⎘  Copy</button>
+        <button onclick="openCode()" class="btn hi" style="flex:1">⧉  New tab</button>
+        <button onclick="downloadCode()" class="btn hi" style="flex:1">↓  Download</button>
+        <button onclick="closeModal()" class="btn hi" style="flex:1">Close</button>
+      </div>
+      <div id="copyConfirm" style="font-size:11px;color:#6a9;text-align:center;height:28px;line-height:28px;margin-top:-8px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const g  = id => document.getElementById(id);
+const fv = id => parseFloat(g(id).value);
+const fd = n  => n.toFixed(3);
+const TAU = Math.PI * 2;
+
+/* ── wire controls ───────────────────────────────────── */
+function wire(id, outId){ g(id).addEventListener('input', () => { g(outId).textContent = g(id).value; renderGrid(); }); }
+wire('count','countOut'); wire('satR','satROut'); wire('coreR','coreROut');
+wire('spread','spreadOut'); wire('neck','neckOut'); wire('juncture','junctureOut');
+wire('cols','colsOut'); wire('gridCount','gridCountOut');
+['fillColor','bgColor'].forEach(id => g(id).addEventListener('input', renderGrid));
+['connectSats','hollowToggle','mergeToggle'].forEach(id => g(id).addEventListener('change', renderGrid));
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderGrid();
+  });
+});
+g('rerollBtn').addEventListener('click', rerollAll);
+
+/* ── seeded rng ──────────────────────────────────────── */
+function mkRng(seed){
+  let s = seed >>> 0;
+  return () => { s=Math.imul(s^(s>>>16),0x45d9f3b); s=Math.imul(s^(s>>>16),0x45d9f3b); s^=s>>>16; return (s>>>0)/4294967296; };
+}
+
+/* ── layouts: returns array of {x,y,r} satellite positions ─
+   Each shape gets per-seed variation:
+   - rotation offset (so radial shapes aren't all pointing up)
+   - per-satellite radius jitter
+   - spread jitter
+*/
+function layout(preset, count, spread, satR, rng){
+  const pts = [];
+  // seed-driven global rotation so shapes all face different directions
+  const rotOffset = rng() * TAU;
+  // seed-driven spread scale (±20%)
+  const spreadScale = .82 + rng() * .38;
+  const sp = spread * spreadScale;
+
+  const rr = (lo,hi) => lo + rng()*(hi-lo);
+  const satJitter = () => satR * rr(.7, 1.3);
+
+  if(preset === 'radial'){
+    for(let i=0;i<count;i++){
+      const a = (i/count)*TAU + rotOffset;
+      pts.push({x: Math.cos(a)*sp, y: Math.sin(a)*sp, r: satJitter()});
+    }
+  } else if(preset === 'ring'){
+    for(let i=0;i<count;i++){
+      const a = (i/count)*TAU + rotOffset + rr(-.18,.18);
+      const d = sp * rr(.88, 1.12);
+      pts.push({x: Math.cos(a)*d, y: Math.sin(a)*d, r: satJitter()});
+    }
+  } else if(preset === 'grid'){
+    const cols = Math.ceil(Math.sqrt(count));
+    const rows = Math.ceil(count/cols);
+    const step = sp * rr(.9, 1.1);
+    let i=0;
+    for(let r=0;r<rows&&i<count;r++){
+      for(let c=0;c<cols&&i<count;c++,i++){
+        pts.push({x:(c-(cols-1)/2)*step, y:(r-(rows-1)/2)*step, r: satJitter()});
+      }
+    }
+  } else if(preset === 'row'){
+    const step = sp * rr(.8, 1.0);
+    for(let i=0;i<count;i++) pts.push({x:(i-(count-1)/2)*step, y:rr(-sp*.15,sp*.15), r: satJitter()});
+  } else if(preset === 'cross'){
+    const perArm = Math.max(1, Math.floor(count/4));
+    // rotate the cross by the seed offset
+    const dirs = [0,1,2,3].map(k=>{ const a=k*Math.PI/2+rotOffset; return [Math.cos(a),Math.sin(a)]; });
+    let placed=0;
+    dirs.forEach(([dx,dy])=>{
+      for(let k=1;k<=perArm&&placed<count;k++,placed++){
+        pts.push({x:dx*k*sp*.75, y:dy*k*sp*.75, r: satJitter()});
+      }
+    });
+    while(placed<count){ pts.push({x:rr(-sp*.3,sp*.3), y:rr(-sp*.3,sp*.3), r:satJitter()}); placed++; }
+  } else { // random
+    for(let i=0;i<count;i++){
+      const a = rng()*TAU;
+      const d = sp*rr(.25,.95);
+      pts.push({x:Math.cos(a)*d, y:Math.sin(a)*d, r: satJitter()});
+    }
+  }
+  return pts;
+}
+
+/* ── smooth bridge between two circles ──────────────────
+   Returns an SVG path string for the filled "neck" shape
+   connecting circle A (cx,cy,r) to circle B (cx2,cy2,r2).
+   neckPct (0–1): how wide the connection is relative to the
+   smaller radius. Uses only circular arcs + cubic beziers,
+   guaranteed no pointy artifacts.
+*/
+function bridge(ax,ay,ar, bx,by,br, neckPct, juncturePct){
+  // angle from A centre to B centre
+  const angle = Math.atan2(by-ay, bx-ax);
+
+  // half-angle of the mouth opening on each circle
+  // sin(halfAngle) = neckWidth / radius
+  // We clamp so the mouth never exceeds ~80° (clean, round)
+  const neckW = neckPct * Math.min(ar,br) * .95;
+  const halfA = Math.min(Math.PI*.44, Math.asin(Math.min(1, neckW/ar)));
+  const halfB = Math.min(Math.PI*.44, Math.asin(Math.min(1, neckW/br)));
+
+  // The four "kiss" points
+  const a1 = angle + Math.PI/2 - halfA; // left side on A
+  const a2 = angle - Math.PI/2 + halfA; // right side on A  (= angle+3π/2-halfA normalised)
+  const b1 = angle + Math.PI/2 + halfB; // left side on B (entering from A)
+  const b2 = angle - Math.PI/2 - halfB; // right side on B
+
+  const p = (cx,cy,r,a) => ({x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r});
+
+  const PA1 = p(ax,ay,ar, a1);  // exit A left
+  const PA2 = p(ax,ay,ar, a2);  // exit A right (= entry from B)
+  const PB1 = p(bx,by,br, b1);  // entry B left
+  const PB2 = p(bx,by,br, b2);  // exit B right
+
+  // Bezier handle length: controlled by juncturePct (5%=tight/sharp, 90%=loose/round)
+  const dist = Math.hypot(bx-ax, by-ay);
+  const hLen = dist * (juncturePct/100);
+
+  // Handles are tangent to circle at the kiss point.
+  // At angle θ on a circle, the CCW tangent direction is θ+π/2.
+  const h = (pt, tangentDir, len) => ({x:pt.x+Math.cos(tangentDir)*len, y:pt.y+Math.sin(tangentDir)*len});
+
+  // Left bridge: A1 → B1  (going "forward", left side)
+  const HA1 = h(PA1, a1-Math.PI/2, hLen);  // tangent pointing toward B
+  const HB1 = h(PB1, b1+Math.PI/2, hLen);  // tangent pointing away from A
+
+  // Right bridge: B2 → A2  (return leg, right side)
+  const HB2 = h(PB2, b2-Math.PI/2, hLen);
+  const HA2 = h(PA2, a2+Math.PI/2, hLen);
+
+  // Arc on A from a2 (right exit) CCW to a1 (left exit)  — the outer arc of A
+  // Arc on B from b1 (left entry) CCW to b2 (right exit) — the outer arc of B
+  const arcA_sweep = ((a1-a2)+TAU)%TAU;  // CCW from a2 to a1
+  const arcB_sweep = ((b2-b1)+TAU)%TAU;  // CCW from b1 to b2
+
+  const largeA = arcA_sweep > Math.PI ? 1 : 0;
+  const largeB = arcB_sweep > Math.PI ? 1 : 0;
+
+  const ex = (pt) => `${fd(pt.x)} ${fd(pt.y)}`;
+
+  // Build the bridge path (just the neck, no circle bodies)
+  return [
+    `M${ex(PA2)}`,                                           // start: right exit on A
+    `A${fd(ar)} ${fd(ar)} 0 ${largeA} 1 ${ex(PA1)}`,        // outer arc on A (CCW)
+    `C${ex(HA1)} ${ex(HB1)} ${ex(PB1)}`,                    // bezier to B left entry
+    `A${fd(br)} ${fd(br)} 0 ${largeB} 1 ${ex(PB2)}`,        // outer arc on B (CCW)
+    `C${ex(HB2)} ${ex(HA2)} ${ex(PA2)}`,                    // bezier back to A right
+    'Z'
+  ].join(' ');
+}
+
+/* ── make one SVG ────────────────────────────────────── */
+let uid = 0;
+function makeShapeSVG(seed, sz=200){
+  const rng       = mkRng(seed);
+  const fill      = g('fillColor').value;
+  const bg        = g('bgColor').value;
+  const count     = Math.round(fv('count'));
+  const satR      = fv('satR') * sz/300;
+  const coreR     = fv('coreR') * sz/300;
+  const spread    = fv('spread') * sz/300;
+  const neckPct   = (100 - fv('neck'))/100;
+  const juncPct   = fv('juncture');
+  const hollow    = g('hollowToggle').checked;
+  const connSats  = g('connectSats').checked;
+  const doMerge   = g('mergeToggle').checked;
+  const preset    = document.querySelector('.preset-btn.active').dataset.preset;
+
+  const cx = sz/2, cy = sz/2;
+  const positions = layout(preset, count, spread, satR, rng);
+  const id = 'u'+(++uid);
+
+  // Collect all circles (core + satellites)
+  const circles = [];
+  if(coreR > 1) circles.push({x:cx, y:cy, r:coreR, isCore:true});
+  positions.forEach(pos => circles.push({x:cx+pos.x, y:cy+pos.y, r:pos.r, isCore:false}));
+
+  // Collect all bridge pairs
+  const bridges = [];
+  positions.forEach(pos => {
+    const sx=cx+pos.x, sy=cy+pos.y, sr=pos.r;
+    if(coreR > 1){
+      const dist = Math.hypot(pos.x, pos.y);
+      if(dist < coreR+sr+sr*2 && dist > Math.abs(coreR-sr)){
+        bridges.push({ax:cx,ay:cy,ar:coreR, bx:sx,by:sy,br:sr});
+      }
+    }
+  });
+  if(connSats && positions.length > 1){
+    for(let i=0;i<positions.length;i++){
+      const a=positions[i], b=positions[(i+1)%positions.length];
+      const dist=Math.hypot(a.x-b.x,a.y-b.y);
+      if(dist < Math.max(a.r,b.r)*5){
+        bridges.push({ax:cx+a.x,ay:cy+a.y,ar:a.r, bx:cx+b.x,by:cy+b.y,br:b.r});
+      }
+    }
+  }
+
+  let paths = '';
+
+  if(doMerge){
+    // MERGE MODE: accumulate all shapes' alpha via feComposite "over" (no blur),
+    // then snap with feColorMatrix. stdDeviation=0 means zero blur — perfectly
+    // crisp edges, true boolean union appearance, no hairline seams.
+    const fid = id+'f';
+    let inner = '';
+    circles.forEach(c => {
+      inner += `<circle cx="${fd(c.x)}" cy="${fd(c.y)}" r="${fd(c.r)}" fill="${fill}"/>`;
+    });
+    bridges.forEach(b => {
+      inner += `<path d="${bridge(b.ax,b.ay,b.ar, b.bx,b.by,b.br, neckPct, juncPct)}" fill="${fill}"/>`;
+    });
+
+    // feColorMatrix: clamp alpha ≥ 0.01 → 1, else 0. No blur involved.
+    // Values: R G B A offset per channel. We want: if A>0 set A=1, RGB=fill color.
+    // Use a large multiplier on alpha channel to saturate it, then clamp via SVG.
+    const fr = parseInt(fill.slice(1,3),16)/255;
+    const fg = parseInt(fill.slice(3,5),16)/255;
+    const fb = parseInt(fill.slice(5,7),16)/255;
+    const mat = `0 0 0 0 ${fr.toFixed(3)}  0 0 0 0 ${fg.toFixed(3)}  0 0 0 0 ${fb.toFixed(3)}  0 0 0 99 -1`;
+
+    let defs = `<filter id="${fid}" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">
+  <feFlood flood-color="${fill}" result="col"/>
+  <feComposite in="col" in2="SourceGraphic" operator="in" result="masked"/>
+  <feColorMatrix type="matrix" values="${mat}"/>
+</filter>`;
+
+    let maskAttr = '';
+    if(hollow && coreR>4){
+      const hR = coreR * .55;
+      defs += `<mask id="${id}m"><rect width="${sz}" height="${sz}" fill="white"/><circle cx="${fd(cx)}" cy="${fd(cy)}" r="${fd(hR)}" fill="black"/></mask>`;
+      maskAttr = `mask="url(#${id}m)"`;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}">
+<defs>${defs}</defs>
+<rect width="${sz}" height="${sz}" fill="${bg}"/>
+<g filter="url(#${fid})" ${maskAttr}>${inner}</g>
+</svg>`;
+
+  } else {
+    // NORMAL MODE: individual circles + bridge paths, all same fill color
+    circles.forEach(c => {
+      paths += `<circle cx="${fd(c.x)}" cy="${fd(c.y)}" r="${fd(c.r)}" fill="${fill}"/>`;
+    });
+    bridges.forEach(b => {
+      paths += `<path d="${bridge(b.ax,b.ay,b.ar, b.bx,b.by,b.br, neckPct, juncPct)}" fill="${fill}"/>`;
+    });
+
+    let defs='', maskAttr='';
+    if(hollow && coreR>4){
+      const hR = coreR * .55;
+      defs=`<defs><mask id="${id}m"><rect width="${sz}" height="${sz}" fill="white"/><circle cx="${fd(cx)}" cy="${fd(cy)}" r="${fd(hR)}" fill="black"/></mask></defs>`;
+      maskAttr=`mask="url(#${id}m)"`;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}">
+${defs}
+<rect width="${sz}" height="${sz}" fill="${bg}"/>
+<g ${maskAttr}>${paths}</g>
+</svg>`;
+  }
+}
+
+/* ── modal ───────────────────────────────────────────── */
+let _modalSVG = '';
+function showModal(svgStr){
+  _modalSVG = svgStr;
+  g('svgCode').value = svgStr;
+  g('copyConfirm').textContent = '';
+  // Render a larger preview (500px) into the left panel
+  const previewSVG = svgStr.replace(/width="\d+" height="\d+"/, 'width="276" height="276"');
+  g('modalPreview').innerHTML = previewSVG;
+  g('modal').style.display = 'flex';
+}
+function closeModal(){ g('modal').style.display = 'none'; }
+function copyCode(){
+  navigator.clipboard.writeText(_modalSVG).then(()=>{
+    g('copyConfirm').textContent = '✓ Copied to clipboard';
+    setTimeout(()=>{ g('copyConfirm').textContent=''; },2500);
+  }).catch(()=>{
+    g('svgCode').select();
+    document.execCommand('copy');
+    g('copyConfirm').textContent = '✓ Copied';
+  });
+}
+function openCode(){
+  const w = window.open('','_blank');
+  if(w){ w.document.write(_modalSVG); w.document.close(); }
+}
+function downloadCode(){
+  const a = document.createElement('a');
+  a.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(_modalSVG);
+  a.download = 'blob.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/* ── grid management ─────────────────────────────────── */
+let seeds = [], selected = new Set();
+
+function rerollAll(){
+  seeds = Array.from({length:Math.round(fv('gridCount'))}, ()=>Math.floor(Math.random()*0xFFFFFF));
+  selected.clear();
+  renderGrid();
+}
+
+function renderGrid(){
+  const count = Math.round(fv('gridCount'));
+  if(seeds.length !== count){ seeds=Array.from({length:count},()=>Math.floor(Math.random()*0xFFFFFF)); selected.clear(); }
+  const cols = Math.round(fv('cols'));
+  const grid = g('blobGrid');
+  const bg   = g('bgColor').value;
+  grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  grid.innerHTML='';
+  seeds.forEach((seed,idx)=>{
+    const svgStr = makeShapeSVG(seed,200);
+    const card = document.createElement('div');
+    card.className='blob-card'+(selected.has(idx)?' selected':'');
+    card.style.background=bg;
+    card.innerHTML=svgStr+`
+      <div class="card-check" id="chk${idx}" onclick="event.stopPropagation();toggleSelect(${idx})">
+        <svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="card-actions">
+        <button class="card-btn" onclick="event.stopPropagation();rerollOne(${idx})">⟳ reroll</button>
+      </div>`;
+    card.addEventListener('click', () => showModal(makeShapeSVG(seeds[idx],400)));
+    grid.appendChild(card);
+  });
+}
+
+function toggleSelect(idx){
+  const card=document.getElementById('chk'+idx)?.closest('.blob-card');
+  if(selected.has(idx)){
+    selected.delete(idx);
+    document.getElementById('chk'+idx)?.classList.remove('checked');
+    card?.classList.remove('selected');
+  } else {
+    selected.add(idx);
+    document.getElementById('chk'+idx)?.classList.add('checked');
+    card?.classList.add('selected');
+  }
+  const n=selected.size;
+  g('hint').textContent=n?`${n} selected`:'Click to open · checkbox to select';
+}
+function rerollOne(idx){seeds[idx]=Math.floor(Math.random()*0xFFFFFF);selected.delete(idx);renderGrid();}
+function downloadSelected(){
+  if(!selected.size){ g('hint').textContent='Check a shape first to select it'; return; }
+  const items=[...selected];
+  items.forEach((i,n)=>{
+    setTimeout(()=>{
+      const a=document.createElement('a');
+      a.href='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(makeShapeSVG(seeds[i],400));
+      a.download=`blob_${i}.svg`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }, n*300);
+  });
+}
+
+renderGrid();
+</script>
+</body>
+</html>
