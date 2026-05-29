@@ -2,7 +2,7 @@
 
 A browser-based tool for generating organic blob shapes made of connected circles. No dependencies, no build step — just open the HTML file.
 
-![SVG Blob Generator screenshot](screenshot.png)
+![SVG Blob Generator screenshot](blob-cross-example.png)
 
 ## Features
 
@@ -37,6 +37,3 @@ No server required. All generation happens client-side in plain JavaScript.
 | Seal seams | Merge all shapes into one unified silhouette |
 | Hollow center | Cut a circular hole through the center |
 
-## License
-
-MIT
